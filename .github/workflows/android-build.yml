@@ -26,7 +26,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Install Android SDK packages
+      - name: Install Android SDK
         run: |
           sdkmanager --install \
             "platform-tools" \
@@ -38,8 +38,29 @@ jobs:
           unzip -o RostoPhotoPro.zip -d .
           test -f RostoPhotoPro/settings.gradle.kts
           test -f RostoPhotoPro/app/build.gradle.kts
+          test -f RostoPhotoPro/app/src/main/AndroidManifest.xml
 
-      - name: Configure AndroidX and Gradle memory
+      - name: Fix missing launcher icon
+        working-directory: RostoPhotoPro
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          manifest = Path("app/src/main/AndroidManifest.xml")
+          text = manifest.read_text(encoding="utf-8")
+
+          text = re.sub(
+              r'android:(?:roundIcon|icon)="@mipmap/[^"]+"',
+              'android:icon="@android:drawable/sym_def_app_icon"',
+              text
+          )
+
+          manifest.write_text(text, encoding="utf-8")
+          print("Updated launcher icon references.")
+          PY
+
+      - name: Configure Gradle
         working-directory: RostoPhotoPro
         run: |
           touch gradle.properties
@@ -57,21 +78,23 @@ jobs:
         with:
           gradle-version: '8.2'
 
-      - name: Build Debug APK
+      - name: Build APK
         working-directory: RostoPhotoPro
-        run: gradle --no-daemon --max-workers=2 --stacktrace assembleDebug
+        run: gradle --no-daemon --max-workers=2 assembleDebug
 
-      - name: Verify APK
+      - name: Find APK
+        id: apk
         run: |
-          APK=$(find RostoPhotoPro/app/build/outputs/apk/debug -type f -name '*.apk' -print -quit)
+          APK=$(find RostoPhotoPro/app/build/outputs/apk/debug \
+            -type f -name '*.apk' -print -quit)
           test -n "$APK"
-          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
           ls -lh "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ROSTO-Photo-Pro-APK
-          path: ${{ env.APK_PATH }}
+          path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
           retention-days: 7
