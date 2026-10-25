@@ -33,10 +33,11 @@ jobs:
             "platforms;android-34" \
             "build-tools;34.0.0"
 
-      - name: Extract project ZIP
+      - name: Extract project
         run: |
           unzip -o RostoPhotoPro.zip -d .
           test -f RostoPhotoPro/settings.gradle.kts
+          test -f RostoPhotoPro/build.gradle.kts
           test -f RostoPhotoPro/app/build.gradle.kts
 
       - name: Set up Gradle
@@ -46,12 +47,17 @@ jobs:
 
       - name: Build Debug APK
         working-directory: RostoPhotoPro
-        run: gradle --no-daemon assembleDebug
+        run: gradle --no-daemon --stacktrace assembleDebug
+
+      - name: Verify APK
+        run: |
+          test -f RostoPhotoPro/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh RostoPhotoPro/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ROSTO-Photo-Pro-APK
-          path: RostoPhotoPro/app/build/outputs/apk/debug/*.apk
+          path: RostoPhotoPro/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
