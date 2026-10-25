@@ -1,38 +1,106 @@
 
-      - name: Fix Kotlin version
-        working-directory: RostoPhotoPro
+name: Build ROSTO Photo APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download project
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install SDK packages
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Extract Android project
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
+          ZIP="$(find . -maxdepth 2 -type f -iname 'RostoPhotoPro.zip' -print -quit)"
+          if [ -n "$ZIP" ]; then
+            mkdir -p RostoPhotoPro
+            unzip -o "$ZIP" -d RostoPhotoPro
+          fi
 
-          files = list(Path(".").rglob("*.gradle"))
-          files += list(Path(".").rglob("*.gradle.kts"))
-          files += list(Path(".").rglob("libs.versions.toml"))
+          if [ -f settings.gradle.kts ] || [ -f settings.gradle ]; then
+            echo "PROJECT_DIR=." >> "$GITHUB_ENV"
+          elif [ -f RostoPhotoPro/settings.gradle.kts ] || [ -f RostoPhotoPro/settings.gradle ]; then
+            echo "PROJECT_DIR=RostoPhotoPro" >> "$GITHUB_ENV"
+          else
+            SETTINGS="$(find . -maxdepth 5 \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
+            if [ -z "$SETTINGS" ]; then
+              echo "ERROR: No Android Gradle project found."
+              exit 1
+            fi
+            echo "PROJECT_DIR=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
+          fi
 
-          for file in files:
-              text = file.read_text(encoding="utf-8")
-              original = text
+      - name: Configure Android project
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          test -f app/build.gradle || test -f app/build.gradle.kts
+          test -f app/src/main/AndroidManifest.xml
 
-              text = re.sub(
-                  r'(?i)(kotlinVersion\s*=\s*["\x27])1\.9\.20(["\x27])',
-                  r'\g<1>1.9.21\2', text
-              )
-              text = re.sub(
-                  r'(?i)(kotlin\s*=\s*["\x27])1\.9\.20(["\x27])',
-                  r'\g<1>1.9.21\2', text
-              )
-              text = text.replace(
-                  'org.jetbrains.kotlin.android" version "1.9.20"',
-                  'org.jetbrains.kotlin.android" version "1.9.21"'
-              )
-              text = text.replace(
-                  'org.jetbrains.kotlin.jvm" version "1.9.20"',
-                  'org.jetbrains.kotlin.jvm" version "1.9.21"'
-              )
+          mkdir -p "$HOME/.gradle"
+          cat > "$HOME/.gradle/gradle.properties" <<'EOF'
+          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
+          org.gradle.parallel=false
+          org.gradle.workers.max=2
+          android.useAndroidX=true
+          EOF
 
-              if text != original:
-                  file.write_text(text, encoding="utf-8")
-                  print(f"Updated: {file}")
-          PY
+          touch gradle.properties
+          grep -q '^android.useAndroidX=' gradle.properties || echo 'android.useAndroidX=true' >> gradle.properties
+
+      - name: Build APK
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew --no-daemon --max-workers=2 assembleDebug
+          else
+            gradle --no-daemon --max-workers=2 assembleDebug
+          fi
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          APK="$(find "$PROJECT_DIR/app/build/outputs/apk" -type f -name '*.apk' -print -quit)"
+          if [ -z "$APK" ]; then
+            echo "ERROR: Build finished without producing an APK."
+            exit 1
+          fi
+          mkdir -p output
+          cp "$APK" output/ROSTO-Photo.apk
+          ls -lh output/ROSTO-Photo.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ROSTO-Photo-APK
+          path: output/ROSTO-Photo.apk
+          if-no-files-found: error
+          retention-days: 7
