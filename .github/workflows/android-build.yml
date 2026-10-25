@@ -17,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -39,12 +39,18 @@ jobs:
           test -f RostoPhotoPro/settings.gradle.kts
           test -f RostoPhotoPro/app/build.gradle.kts
 
-      - name: Enable AndroidX
+      - name: Configure AndroidX and Gradle memory
         working-directory: RostoPhotoPro
         run: |
           touch gradle.properties
-          grep -q '^android.useAndroidX=true$' gradle.properties || echo 'android.useAndroidX=true' >> gradle.properties
-          grep -q '^android.enableJetifier=' gradle.properties || echo 'android.enableJetifier=true' >> gradle.properties
+          sed -i '/^org.gradle.jvmargs=/d' gradle.properties
+          sed -i '/^android.useAndroidX=/d' gradle.properties
+          sed -i '/^android.enableJetifier=/d' gradle.properties
+          echo 'org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' >> gradle.properties
+          echo 'android.useAndroidX=true' >> gradle.properties
+          echo 'android.enableJetifier=true' >> gradle.properties
+          echo 'org.gradle.parallel=false' >> gradle.properties
+          echo 'org.gradle.workers.max=2' >> gradle.properties
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -53,17 +59,19 @@ jobs:
 
       - name: Build Debug APK
         working-directory: RostoPhotoPro
-        run: gradle --no-daemon --stacktrace assembleDebug
+        run: gradle --no-daemon --max-workers=2 --stacktrace assembleDebug
 
       - name: Verify APK
         run: |
-          find RostoPhotoPro/app/build/outputs/apk -type f -name '*.apk'
-          test -n "$(find RostoPhotoPro/app/build/outputs/apk -type f -name '*.apk' -print -quit)"
+          APK=$(find RostoPhotoPro/app/build/outputs/apk/debug -type f -name '*.apk' -print -quit)
+          test -n "$APK"
+          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
+          ls -lh "$APK"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ROSTO-Photo-Pro-APK
-          path: RostoPhotoPro/app/build/outputs/apk/debug/*.apk
+          path: ${{ env.APK_PATH }}
           if-no-files-found: error
           retention-days: 7
