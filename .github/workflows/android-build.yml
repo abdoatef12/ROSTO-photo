@@ -4,7 +4,8 @@ name: Build ROSTO Photo Pro APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -29,25 +30,31 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Verify project
+      - name: Verify Android project
         shell: bash
         run: |
           set -e
           test -d "$PROJECT_DIR/app"
-          test -f "$PROJECT_DIR/settings.gradle.kts" || test -f "$PROJECT_DIR/settings.gradle"
-          test -f "$PROJECT_DIR/build.gradle.kts" || test -f "$PROJECT_DIR/build.gradle"
-          echo "Project directory verified."
+          test -f "$PROJECT_DIR/settings.gradle.kts" || \
+            test -f "$PROJECT_DIR/settings.gradle"
+          test -f "$PROJECT_DIR/build.gradle.kts" || \
+            test -f "$PROJECT_DIR/build.gradle"
+          test -f "$PROJECT_DIR/app/src/main/AndroidManifest.xml"
+          echo "Android project verified."
 
-      - name: Install Android SDK
+      - name: Install Android SDK packages
         shell: bash
         run: |
           set -e
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
           if [ ! -f "$SDKMANAGER" ]; then
-            echo "sdkmanager not found at $SDKMANAGER"
+            echo "ERROR: sdkmanager not found: $SDKMANAGER"
             exit 1
           fi
+
           yes | "$SDKMANAGER" --licenses >/dev/null || true
+
           "$SDKMANAGER" \
             "platform-tools" \
             "platforms;android-34" \
@@ -62,35 +69,63 @@ jobs:
           touch gradle.properties
 
           if grep -q '^android.useAndroidX=' gradle.properties; then
-            sed -i 's/^android.useAndroidX=.*/android.useAndroidX=true/' gradle.properties
+            sed -i \
+              's/^android.useAndroidX=.*/android.useAndroidX=true/' \
+              gradle.properties
           else
             echo 'android.useAndroidX=true' >> gradle.properties
           fi
 
           if grep -q '^android.enableJetifier=' gradle.properties; then
-            sed -i 's/^android.enableJetifier=.*/android.enableJetifier=true/' gradle.properties
+            sed -i \
+              's/^android.enableJetifier=.*/android.enableJetifier=true/' \
+              gradle.properties
           else
             echo 'android.enableJetifier=true' >> gradle.properties
           fi
 
           if [ -f build.gradle.kts ]; then
-            sed -i 's/version "1\.9\.20"/version "1.9.21"/g' build.gradle.kts
+            sed -i \
+              's/version "1\.9\.20"/version "1.9.21"/g' \
+              build.gradle.kts
           fi
 
           if [ -f app/build.gradle.kts ]; then
-            sed -i 's/version "1\.9\.20"/version "1.9.21"/g' app/build.gradle.kts
+            sed -i \
+              's/version "1\.9\.20"/version "1.9.21"/g' \
+              app/build.gradle.kts
           fi
 
+          echo "Gradle properties:"
           cat gradle.properties
+
+      - name: Fix missing launcher icon reference
+        shell: bash
+        run: |
+          set -e
+          cd "$PROJECT_DIR"
+
+          MANIFEST="app/src/main/AndroidManifest.xml"
+
+          sed -i \
+            's|@mipmap/ic_launcher|@android:drawable/sym_def_app_icon|g' \
+            "$MANIFEST"
+
+          echo "Manifest icon reference:"
+          grep -n 'android:icon\|android:roundIcon' "$MANIFEST" || true
 
       - name: Install Gradle 8.2.1
         shell: bash
         run: |
           set -e
+
           curl -fL --retry 3 \
-            https://services.gradle.org/distributions/gradle-8.2.1-bin.zip \
+            "https://services.gradle.org/distributions/gradle-8.2.1-bin.zip" \
             -o "$RUNNER_TEMP/gradle.zip"
-          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP"
+
+          unzip -q "$RUNNER_TEMP/gradle.zip" \
+            -d "$RUNNER_TEMP"
+
           "$RUNNER_TEMP/gradle-8.2.1/bin/gradle" --version
 
       - name: Build debug APK
@@ -98,6 +133,7 @@ jobs:
         run: |
           set -e
           cd "$PROJECT_DIR"
+
           "$RUNNER_TEMP/gradle-8.2.1/bin/gradle" \
             --no-daemon \
             --stacktrace \
@@ -109,13 +145,14 @@ jobs:
         shell: bash
         run: |
           set -e
+
           APK_PATH="$(find "$PROJECT_DIR" \
             -type f \
             -path '*/build/outputs/apk/debug/*.apk' \
             -print -quit)"
 
           if [ -z "$APK_PATH" ]; then
-            echo "APK file was not generated."
+            echo "ERROR: APK was not generated."
             find "$PROJECT_DIR" -type f -name '*.apk' -print
             exit 1
           fi
@@ -123,7 +160,7 @@ jobs:
           echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
           echo "APK generated: $APK_PATH"
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: ROSTO-Photo-Pro-debug-APK
