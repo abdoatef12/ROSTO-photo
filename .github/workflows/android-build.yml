@@ -1,106 +1,76 @@
-
-name: Build ROSTO Photo APK
+name: Build ROSTO APK
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 60
+    
+    permissions:
+      contents: read
+      actions: write
+    
     steps:
-      - name: Download project
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Install Java
+      
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
           java-version: '17'
-
-      - name: Install Android SDK
-        uses: android-actions/setup-android@v4
-
-      - name: Install SDK packages
+          distribution: 'temurin'
+          cache: gradle
+      
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@v1
+      
+      - name: Build with Gradle
+        run: ./gradlew clean assembleDebug -x lint
+        env:
+          GRADLE_OPTS: -Xmx4096m
+      
+      - name: Build Release APK
+        run: ./gradlew assembleRelease -x lint
+        env:
+          GRADLE_OPTS: -Xmx4096m
+        continue-on-error: true
+      
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+      
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 30
+      
+      - name: Build Status
+        if: always()
         run: |
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
-
-      - name: Extract Android project
-        shell: bash
-        run: |
-          ZIP="$(find . -maxdepth 2 -type f -iname 'RostoPhotoPro.zip' -print -quit)"
-          if [ -n "$ZIP" ]; then
-            mkdir -p RostoPhotoPro
-            unzip -o "$ZIP" -d RostoPhotoPro
-          fi
-
-          if [ -f settings.gradle.kts ] || [ -f settings.gradle ]; then
-            echo "PROJECT_DIR=." >> "$GITHUB_ENV"
-          elif [ -f RostoPhotoPro/settings.gradle.kts ] || [ -f RostoPhotoPro/settings.gradle ]; then
-            echo "PROJECT_DIR=RostoPhotoPro" >> "$GITHUB_ENV"
+          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            echo "✅ Debug APK built successfully!"
+            ls -lh app/build/outputs/apk/debug/*.apk
           else
-            SETTINGS="$(find . -maxdepth 5 \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
-            if [ -z "$SETTINGS" ]; then
-              echo "ERROR: No Android Gradle project found."
-              exit 1
-            fi
-            echo "PROJECT_DIR=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
-          fi
-
-      - name: Configure Android project
-        shell: bash
-        run: |
-          cd "$PROJECT_DIR"
-          test -f app/build.gradle || test -f app/build.gradle.kts
-          test -f app/src/main/AndroidManifest.xml
-
-          mkdir -p "$HOME/.gradle"
-          cat > "$HOME/.gradle/gradle.properties" <<'EOF'
-          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
-          org.gradle.parallel=false
-          org.gradle.workers.max=2
-          android.useAndroidX=true
-          EOF
-
-          touch gradle.properties
-          grep -q '^android.useAndroidX=' gradle.properties || echo 'android.useAndroidX=true' >> gradle.properties
-
-      - name: Build APK
-        shell: bash
-        run: |
-          cd "$PROJECT_DIR"
-
-          if [ -f gradlew ]; then
-            chmod +x gradlew
-            ./gradlew --no-daemon --max-workers=2 assembleDebug
-          else
-            gradle --no-daemon --max-workers=2 assembleDebug
-          fi
-
-      - name: Verify APK
-        shell: bash
-        run: |
-          APK="$(find "$PROJECT_DIR/app/build/outputs/apk" -type f -name '*.apk' -print -quit)"
-          if [ -z "$APK" ]; then
-            echo "ERROR: Build finished without producing an APK."
+            echo "❌ Debug APK build failed"
             exit 1
           fi
-          mkdir -p output
-          cp "$APK" output/ROSTO-Photo.apk
-          ls -lh output/ROSTO-Photo.apk
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: ROSTO-Photo-APK
-          path: output/ROSTO-Photo.apk
-          if-no-files-found: error
-          retention-days: 7
