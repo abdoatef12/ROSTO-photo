@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <domain name="database" />
+    <domain name="file" />
+    <domain name="database_preferences" />
+    <domain name="sharedpref" excludeDomain="com.example.shared_pref" />
+</full-backup-content>

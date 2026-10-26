@@ -1,0 +1,75 @@
+# Gradle
+.gradle
+build/
+.gradle/
+*.apk
+*.ap_
+
+# Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+local.properties
+.DS_Store
+
+# Generated files
+bin/
+gen/
+res_backup/
+
+# Build files
+*.dex
+*.class
+*.jar
+*.so
+
+# ProGuard
+proguard-project.txt
+proguard/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+lint-results.html
+
+# Dependencies
+libs/
+
+# IDE
+.vscode/
+.settings/
+.classpath
+.project
+
+# Misc
+*.swp
+*.swo
+*~
+.project
+.cproject
+.c9/
+*.launch
+.loadpath
+.factorypath
+.buildpath
+.texlipse
+
+# CMake
+cmake-build-*/
+
+# IntelliJ
+*.workspace
+*.sublime-workspace
+
+# VS Code
+.vscode/
+*.code-workspace

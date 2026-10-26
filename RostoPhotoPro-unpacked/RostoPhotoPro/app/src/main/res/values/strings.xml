@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">روستو برو</string>
+    <string name="app_description">محرر الصور الاحترافي المجاني</string>
+    
+    <!-- Home Screen -->
+    <string name="open_image">فتح صورة</string>
+    <string name="camera">كاميرا</string>
+    <string name="tools">الأدوات</string>
+    <string name="recent_projects">المشاريع الأخيرة</string>
+    <string name="settings">الإعدادات</string>
+    <string name="no_projects">لا توجد مشاريع حالياً</string>
+    
+    <!-- Editor Screen -->
+    <string name="editor_title">محرر الصور</string>
+    <string name="download">تنزيل</string>
+    <string name="share">مشاركة</string>
+    <string name="brightness">السطوع</string>
+    <string name="contrast">التباين</string>
+    <string name="saturation">التشبع</string>
+    <string name="advanced_tools">أدوات متقدمة</string>
+    <string name="undo">تراجع</string>
+    <string name="redo">إعادة</string>
+    <string name="save">حفظ</string>
+    
+    <!-- Filters -->
+    <string name="filter_none">بدون فلتر</string>
+    <string name="filter_grayscale">رمادي</string>
+    <string name="filter_warm">دافئ</string>
+    <string name="filter_cold">بارد</string>
+    <string name="filter_sharp">حاد</string>
+    <string name="filter_soft">ناعم</string>
+    <string name="filter_vintage">Vintage</string>
+    <string name="filter_neon">Neon</string>
+    <string name="filter_cyberpunk">Cyberpunk</string>
+    <string name="filter_dreamy">Dreamy</string>
+    <string name="filter_hdr">HDR</string>
+    <string name="filter_glow">Glow</string>
+    
+    <!-- Tools -->
+    <string name="tool_edit">تحرير</string>
+    <string name="tool_crop">قص</string>
+    <string name="tool_adjust">ضبط</string>
+    <string name="tool_filters">فلاتر</string>
+    <string name="tool_layers">طبقات</string>
+    <string name="tool_text">نصوص</string>
+    <string name="tool_colors">ألوان</string>
+    <string name="tool_ai">ذكاء</string>
+    
+    <!-- Projects -->
+    <string name="projects_title">المشاريع</string>
+    <string name="no_projects_message">لا توجد مشاريع حالياً</string>
+    <string name="new_project">مشروع جديد</string>
+    <string name="delete">حذف</string>
+    <string name="back">رجوع</string>
+</resources>
