@@ -60,7 +60,7 @@ jobs:
             "platforms;android-34" \
             "build-tools;34.0.0"
 
-      - name: Configure AndroidX and Kotlin
+      - name: Configure Gradle memory and AndroidX
         shell: bash
         run: |
           set -e
@@ -68,51 +68,39 @@ jobs:
 
           touch gradle.properties
 
-          if grep -q '^android.useAndroidX=' gradle.properties; then
-            sed -i \
-              's/^android.useAndroidX=.*/android.useAndroidX=true/' \
-              gradle.properties
-          else
-            echo 'android.useAndroidX=true' >> gradle.properties
-          fi
+          set_property() {
+            KEY="$1"
+            VALUE="$2"
+            FILE="gradle.properties"
 
-          if grep -q '^android.enableJetifier=' gradle.properties; then
-            sed -i \
-              's/^android.enableJetifier=.*/android.enableJetifier=true/' \
-              gradle.properties
-          else
-            echo 'android.enableJetifier=true' >> gradle.properties
-          fi
+            if grep -qE "^${KEY}=" "$FILE"; then
+              sed -i "s|^${KEY}=.*|${KEY}=${VALUE}|" "$FILE"
+            else
+              printf '%s=%s\n' "$KEY" "$VALUE" >> "$FILE"
+            fi
+          }
 
-          if [ -f build.gradle.kts ]; then
-            sed -i \
-              's/version "1\.9\.20"/version "1.9.21"/g' \
-              build.gradle.kts
-          fi
+          set_property "android.useAndroidX" "true"
+          set_property "android.enableJetifier" "true"
+          set_property "org.gradle.jvmargs" "-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+          set_property "org.gradle.parallel" "false"
+          set_property "org.gradle.workers.max" "2"
+          set_property "kotlin.daemon.jvmargs" "-Xmx2g"
 
-          if [ -f app/build.gradle.kts ]; then
-            sed -i \
-              's/version "1\.9\.20"/version "1.9.21"/g' \
-              app/build.gradle.kts
-          fi
-
-          echo "Gradle properties:"
+          echo "Gradle properties configured:"
           cat gradle.properties
 
-      - name: Fix missing launcher icon reference
+      - name: Fix launcher icon reference
         shell: bash
         run: |
           set -e
-          cd "$PROJECT_DIR"
-
-          MANIFEST="app/src/main/AndroidManifest.xml"
+          MANIFEST="$PROJECT_DIR/app/src/main/AndroidManifest.xml"
 
           sed -i \
             's|@mipmap/ic_launcher|@android:drawable/sym_def_app_icon|g' \
             "$MANIFEST"
 
-          echo "Manifest icon reference:"
-          grep -n 'android:icon\|android:roundIcon' "$MANIFEST" || true
+          echo "Launcher icon reference checked."
 
       - name: Install Gradle 8.2.1
         shell: bash
@@ -140,25 +128,24 @@ jobs:
             --max-workers=2 \
             assembleDebug
 
-      - name: Find APK
+      - name: Verify APK output
         id: find_apk
         shell: bash
         run: |
           set -e
 
-          APK_PATH="$(find "$PROJECT_DIR" \
-            -type f \
-            -path '*/build/outputs/apk/debug/*.apk' \
-            -print -quit)"
+          APK_PATH="$(find "$PROJECT_DIR/app/build/outputs/apk/debug" \
+            -maxdepth 1 -type f -name '*.apk' -print -quit)"
 
           if [ -z "$APK_PATH" ]; then
-            echo "ERROR: APK was not generated."
+            echo "ERROR: Debug APK was not generated."
             find "$PROJECT_DIR" -type f -name '*.apk' -print
             exit 1
           fi
 
           echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
-          echo "APK generated: $APK_PATH"
+          ls -lh "$APK_PATH"
+          echo "APK successfully generated."
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
